@@ -13,8 +13,6 @@ requirements
 
 ### CHAPTER #1 </br>traefik pointing to various docker containers
 
-steps
-
 - have traefik.yml file
 - run traefik container using docker-compose.yml
 - add labels to some containers, nginx, apache, portainer, whoami
@@ -127,7 +125,7 @@ networks:
     external: true
 ```
 
-**apache docker-compose.yml**
+**portainer docker-compose.yml**
 
 this one is at portainer.fuckingwhateverblabla.org
 
