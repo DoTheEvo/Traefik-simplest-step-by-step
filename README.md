@@ -180,11 +180,74 @@ And then just run any of them with docker-compose, like this for whoami: `docker
           name: $DEFAULT_NETWORK
     ```
 
-### CHAPTER #2 </br>traefik pointing not to docker containers
+### CHAPTER #2 </br>traefik routing to local IP addresses or wherever
 
-- use traefik.yml and in there defined file provider
-- set up route to some IP or URL
-- done
+If url should not aim at some docker container, a new file provider is needed.
+
+- **create servers.yml** with router and a service.
+
+   **servers.yml**
+
+    ```
+    http:
+      routers:
+        test:
+          rule: "Host(`test.whateverblablabla.org`)"
+          service: test
+          entryPoints:
+            - web
+
+      services:
+        test:
+          loadBalancer:
+            servers:
+              - url: "http://10.0.19.5:80"
+    ```
+
+- **define a file provider in traefik.yml** pointing at the servers.yml file
+
+   **traefik.yml**
+    ```
+    api:
+      insecure: true
+      dashboard: true
+
+    entryPoints:
+      web:
+        address: ":80"
+
+    providers:
+      docker:
+        endpoint: "unix:///var/run/docker.sock"
+        exposedByDefault: false
+      file:
+        filename: "servers.yml"
+    ```
+
+- **mount servers.yml in to traefik container** by adding a line in traefik-docker-compose.yml**
+
+    **traefik-docker-compose.yml**
+    ```
+    version: "3.3"
+
+    services:
+      traefik:
+        image: "traefik:v2.0"
+        container_name: "traefik"
+        ports:
+          - "80:80"
+          - "8080:8080"
+        volumes:
+          - "/var/run/docker.sock:/var/run/docker.sock:ro"
+          - "./traefik.yml:/traefik.yml:ro"
+          - "./servers.yml:/servers.yml:ro"
+
+
+    networks:
+      default:
+        external:
+          name: $DEFAULT_NETWORK
+    ````
 
 ### CHAPTER #3 </br>let's encrypt certificate, html challange
 
