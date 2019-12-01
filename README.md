@@ -8,7 +8,15 @@ requirements
 - use cloudflare to manage DNS of `whateverblablabla.org`
 - open ports for https challange
 
-### CHAPTER #1 </br>traefik pointing to various docker containers
+chapters
+
+- traefik routing to docker containers
+- traefik routing to local IP addresses or wherever
+- middlewares authentification example
+- let's encrypt certificate, html challange
+- let's encrypt certificate, DNS challange
+
+### CHAPTER #1 </br>traefik routing to various docker containers
 
 - **create a new docker network** `docker network create traefik_net`.
 Traefik and the containers need to be on the same network.
@@ -81,7 +89,7 @@ The default network is defined so that it can be used in other compose files.
       default:
         external:
           name: $DEFAULT_NETWORK
-    ````
+    ```
 
 - **run traefik-docker-compose.yml**</br>
 `docker-compose -f traefik-docker-compose.yml up -d` will start the traefik container.
@@ -99,7 +107,6 @@ As is obvious from the patern, all that is needed is adding few self-explanatory
 And then just run any of them with docker-compose, like this for whoami: `docker-compose -f whoami-docker-compose.yml up -d`
 
     **whoami-docker-compose.yml**
-
     ```
     version: '3'
 
@@ -119,7 +126,6 @@ And then just run any of them with docker-compose, like this for whoami: `docker
     ```
 
     **nginx-docker-compose.yml**
-
     ```
     version: '3'
 
@@ -136,10 +142,9 @@ And then just run any of them with docker-compose, like this for whoami: `docker
       default:
         external:
           name: $DEFAULT_NETWORK
-    ````
+    ```
 
     **apache-docker-compose.yml**
-
     ```
     version: '3'
 
@@ -159,7 +164,6 @@ And then just run any of them with docker-compose, like this for whoami: `docker
     ```
 
     **portainer-docker-compose.yml**
-
     ```
     version: '3'
 
@@ -182,12 +186,11 @@ And then just run any of them with docker-compose, like this for whoami: `docker
 
 ### CHAPTER #2 </br>traefik routing to local IP addresses or wherever
 
-If url should not aim at some docker container, a new file provider is needed.
+If url should aim at something else than a docker container, a new file provider is needed.
 
 - **create servers.yml** with router and a service.
 
    **servers.yml**
-
     ```
     http:
       routers:
@@ -247,13 +250,244 @@ If url should not aim at some docker container, a new file provider is needed.
       default:
         external:
           name: $DEFAULT_NETWORK
-    ````
+    ```
 
-### CHAPTER #3 </br>let's encrypt certificate, html challange
+### CHAPTER #3 </br>middlewares
 
-- make some files and change their 
-- add some labels
-- done
+Example of authentification middleware for any container.
+
+
+- **create a `users_file`** containing username:passwords, [htpasswd](https://www.htaccesstools.com/htpasswd-generator/) style
+
+    **users_file**
+    ```
+    me:$apr1$wNMrGf17$xlOV5D1dtvFHGBYMCSjYM.
+    admin:$apr1$hwaRrKGu$hJFHy0z3KwJHovY8TGG5J/
+    sadavir:$apr1$bZixfVAv$VKm66D9chzt.us.lnaJWz.
+    ```
+
+- mount users_file in traefik-docker-compose.yml
+
+    **traefik-docker-compose.yml**
+    ```
+    version: "3.3"
+
+    services:
+      traefik:
+        image: "traefik:v2.0"
+        container_name: "traefik"
+        ports:
+          - "80:80"
+          - "8080:8080"
+        volumes:
+          - "/var/run/docker.sock:/var/run/docker.sock:ro"
+          - "./traefik.yml:/traefik.yml:ro"
+          - "./users_file:/users_file:ro"
+
+    networks:
+      default:
+        external:
+          name: $DEFAULT_NETWORK
+    ```
+
+- add two labels to a container to activate middleware. No need to mount the users_file here.
+
+    **whoami-docker-compose.yml**
+    ```
+    version: '3'
+
+    services:
+      whoami:
+        image: "containous/whoami"
+        container_name: "whoami"
+        labels:
+          - "traefik.enable=true"
+          - "traefik.http.routers.whoami.entrypoints=web"
+          - "traefik.http.routers.whoami.rule=Host(`whoami.$MY_DOMAIN`)"
+          - "traefik.http.routers.whoami.middlewares=my-auth"
+          - "traefik.http.middlewares.my-auth.basicauth.usersfile=/users_file"
+
+    networks:
+      default:
+        external:
+          name: $DEFAULT_NETWORK
+    ```
+
+    **nginx-docker-compose.yml**
+    ```
+    version: '3'
+
+    services:
+      nginx:
+        image: nginx:latest
+        container_name: nginx
+        labels:
+          - "traefik.enable=true"
+          - "traefik.http.routers.nginx.entrypoints=web"
+          - "traefik.http.routers.nginx.rule=Host(`nginx.$MY_DOMAIN`)"
+          - "traefik.http.routers.nginx.middlewares=my-auth"
+          - "traefik.http.middlewares.my-auth.basicauth.usersfile=/users_file"
+
+    networks:
+      default:
+        external:
+          name: $DEFAULT_NETWORK
+    ```
+
+
+### CHAPTER #4 </br>let's encrypt certificate, html challange
+
+- add certificate resolver to traefik.yml
+Defining caServer makes LE issue invalid stating/testing certificates.
+Email is where LE sends notification about certificates ending
+
+   **traefik.yml**
+    ```
+    api:
+      insecure: true
+      dashboard: true
+
+    entryPoints:
+      web:
+        address: ":80"
+      websecure:
+        address: ":443"
+
+    providers:
+      docker:
+        endpoint: "unix:///var/run/docker.sock"
+        exposedByDefault: false
+
+    certificatesResolvers:
+      lets-encr:
+        acme:
+          caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+          storage: acme.json
+          email: whatever@gmail.com
+          httpChallenge:
+            entryPoint: web
+    ```
+
+- **add port 443 and mount acme.json** in traefik-docker-compose.yml 
+
+   **traefik-docker-compose.yml**
+    ```
+    version: "3.3"
+
+    services:
+      traefik:
+        image: "traefik:v2.0"
+        container_name: "traefik"
+        env_file:
+          - .env
+        ports:
+          - "80:80"
+          - "443:443"
+          - "8080:8080"
+        volumes:
+          - "/var/run/docker.sock:/var/run/docker.sock:ro"
+          - "./traefik.yml:/traefik.yml:ro"
+          - "./acme.json:/acme.json"
+
+    networks:
+      default:
+        external:
+          name: $DEFAULT_NETWORK
+    ```
+
+- **add required labels to containers** 
+
+    **whoami-docker-compose.yml**
+    ```
+    version: '3'
+
+    services:
+      whoami:
+        image: "containous/whoami"
+        container_name: "whoami"
+        labels:
+          - "traefik.enable=true"
+          - "traefik.http.routers.whoami.entrypoints=websecure"
+          - "traefik.http.routers.whoami.rule=Host(`whoami.$MY_DOMAIN`)"
+          - "traefik.http.routers.whoami.tls.certresolver=lets-encr"
+
+    networks:
+      default:
+        external:
+          name: $DEFAULT_NETWORK
+    ```
+
+   **nginx-docker-compose.yml**
+    ```
+    version: '3'
+
+    services:
+      nginx:
+        image: nginx:latest
+        container_name: nginx
+        labels:
+          - "traefik.enable=true"
+          - "traefik.http.routers.nginx.entrypoints=websecure"
+          - "traefik.http.routers.nginx.rule=Host(`nginx.$MY_DOMAIN`)"
+          - "traefik.http.routers.nginx.tls.certresolver=lets-encr"
+
+    networks:
+      default:
+        external:
+          name: $DEFAULT_NETWORK
+    ```
+
+- reddirect html traffic to htmls by adding labels to compose files
+
+    **whoami-docker-compose.yml**
+    ```
+    version: '3'
+
+    services:
+      whoami:
+        image: "containous/whoami"
+        container_name: "whoami"
+        labels:
+          - "traefik.enable=true"
+          - "traefik.http.routers.whoami.entrypoints=websecure"
+          - "traefik.http.routers.whoami.rule=Host(`whoami.$MY_DOMAIN`)"
+          - "traefik.http.routers.whoami.tls.certresolver=lets-encr"
+          - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+          - "traefik.http.routers.redirs.rule=hostregexp(`{host:.+}`)"
+          - "traefik.http.routers.redirs.entrypoints=web"
+          - "traefik.http.routers.redirs.middlewares=redirect-to-https"
+
+    networks:
+      default:
+        external:
+          name: $DEFAULT_NETWORK
+    ```
+
+   **nginx-docker-compose.yml**
+    ```
+    version: '3'
+
+    services:
+      nginx:
+        image: nginx:latest
+        container_name: nginx
+        labels:
+          - "traefik.enable=true"
+          - "traefik.http.routers.nginx.entrypoints=websecure"
+          - "traefik.http.routers.nginx.rule=Host(`nginx.$MY_DOMAIN`)"
+          - "traefik.http.routers.nginx.tls.certresolver=lets-encr"
+          - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+          - "traefik.http.routers.redirs.rule=hostregexp(`{host:.+}`)"
+          - "traefik.http.routers.redirs.entrypoints=web"
+          - "traefik.http.routers.redirs.middlewares=redirect-to-https"
+
+    networks:
+      default:
+        external:
+          name: $DEFAULT_NETWORK
+    ```
+
+
 
 ### CHAPTER #4 </br>let's encrypt certificate, DNS challange
 
