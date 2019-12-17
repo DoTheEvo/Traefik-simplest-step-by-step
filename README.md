@@ -4,16 +4,16 @@ requirements
 
 - have docker running somewhere
 - have a domain `whateverblablabla.org`
-- use cloudflare to manage DNS
+- use cloudflare to manage DNS of the domain
 - have 80/443 ports open
 
 chapters
 
 1. [traefik routing to docker containers](#1-traefik-routing-to-various-docker-containers)
-2. [traefik routing to local IP addresses or wherever](#2-traefik-routing-to-local-IP-addresses-or-wherever)
+2. [traefik routing to a local IP addresses](#2-traefik-routing-to-a-local-IP-addresses)
 3. [middlewares](#3-middlewares)
-4. [let's encrypt certificate, html challange](#4-let's-encrypt-certificate,-html-challange)
-5. [let's encrypt certificate, DNS challange](#4-let's-encrypt-certificate,-DNS-challange-on-cloudflare)
+4. [let's encrypt certificate html challange](#4-let's-encrypt-certificate-html-challange)
+5. [let's encrypt certificate DNS challange](#5-let's-encrypt-certificate-DNS-challange-on-cloudflare)
 
 ### #1 traefik routing to various docker containers
 
@@ -52,7 +52,8 @@ Or run command `docker inspect -f '{{ .Mounts }}' traefik` to see active mounts 
 You don't want to be the moron who makes changes to traefik.yml and it does nothing because the file is not in use.
 
 
-- **create .env** file that contains variables that will be available for docker-compose when running `up` command.
+- **create `.env`** file that contains variables that will be available for docker-compose
+as enviroment variables when running the `up` command.
 This alows compose files to be moved from system to system more freely and changes are done to the .env file,
 so there's smaller possibility for a fuckup.
 
@@ -62,10 +63,13 @@ so there's smaller possibility for a fuckup.
     DEFAULT_NETWORK=traefik_net
     ```
 
-    *extra info:* `docker-compose config` or `docker-compose -f traefik-docker-compose.yml config` shows how will compose look with variables filled in
+    *extra info:* `docker-compose config` or `docker-compose -f traefik-docker-compose.yml config`
+    show how will compose look with the variables filled in.</br>
+    Also getting in to the container with `docker container exec -it traefik sh`
+    and then `printenv` can be useful.
 
 - **create traefik-docker-compose.yml** file. It's a simple typical compose file.
-Port 80 is mapped since it is used as an entryPoint where $MY_DOMAIN will land you.
+Port 80 is mapped since we want traefik to be in charge of it and use it as entrypoint.
 Port 8080 is for dashboard where traefik shows info and stats.
 Mount of docker.sock is needed so it can actually do its job communicating with docker.
 Mount of traefik.yml is what gives the static traefik configuration.
@@ -108,7 +112,9 @@ The default network is defined so that it can be used in other compose files.
     like this: `command: --api.insecure=true --providers.docker`</br>
     But that way feels bit more messy than having nicely structured yml file,
     but it does give benefit of having more centralized one-place to manage stuff,
-    and also ability to pass variables using .env file
+    not this dancing between various config files. 
+    Also .env file variables works for compose files but not for static config files,
+    so that's another benefit of maybe rather going command way.
 
 - **add labels to containers** that you want traefik to route.</br>
 Here are examples of whoami, nginx, apache, portainer.
@@ -204,12 +210,14 @@ As is obvious from the patern, all that is needed is adding few self-explanatory
     `docker-compose -f portainer-docker-compose.yml up -d`
 
 
-### #2 traefik routing to local IP addresses or wherever
+### #2 traefik routing to a local IP addresses
 
-If url should aim at something other than a docker container, a new provider is needed, a file provider.
+If url should aim at something other than a docker container.
 
-- **create servers.yml** containing router that will catch specific url
- and a loadBalancer that will route traffic fitting the rule to the specific IP or domain
+- **create servers.yml** containing routers with a rule
+because something has to catch the desired url.
+And then theres a service, type of a loadBalancer,
+that will route traffic fitting the rule to a specific IP or domain.
 
    `servers.yml`
     ```
@@ -279,7 +287,7 @@ If url should aim at something other than a docker container, a new provider is 
 Example of authentification middleware for any container.
 
 
-- **create a `users_file`** containing username:passwords, [htpasswd](https://www.htaccesstools.com/htpasswd-generator/) style
+- **create a `users_file`** containing username:passwords pairs, [htpasswd](https://www.htaccesstools.com/htpasswd-generator/) style
 
     `users_file`
     ```
@@ -312,9 +320,10 @@ Example of authentification middleware for any container.
           name: $DEFAULT_NETWORK
     ```
 
-- add two labels to a container to activate middleware. No need to mount the users_file here.
- The first label creates new middleware called my-auth.
- The second label gives this middleware type of basicauth and points it to users_file.
+- add two labels to a container to activate middleware. 
+The first label creates new middleware called my-auth.
+The second label gives this middleware type of basicauth and points it to users_file.
+No need to mount the users_file here.
 
     `whoami-docker-compose.yml`
     ```
@@ -366,10 +375,11 @@ Example of authentification middleware for any container.
   My understanding of the process, simplified.
 
   `LE` - Let's Encrypt. A service that gives out free certificates</br>
-  `Certificate` - a file on the server containing cryptographic key that confirms the identity of the server</br>
+  `Certificate` - a file on the server containing cryptographic key
+   that allows encrypted communication and can be also used to confirm the identity of the server</br>
   `ACME` - a protocol(precisely agreed way of communication) to negotiatie certificates
   from LE. It is part of traefik.</br>
-  `DNS` - translates domain names in to ip addresse</br>
+  `DNS` - servers on the internet, translate domain names in to ip addresse</br>
 
   Traefik uses ACME to ask LE for a certificate for a specific domain, like `whateverblablabla.org`.
   LE answers with some random generated text that traefik puts at a specific place on the server.
@@ -378,7 +388,8 @@ Example of authentification middleware for any container.
 
   If it's there then this proves that whoever asked for the certificate controls both
   the server and the domain, since it showed control over DNS records.
-  Certificate is given and is valid for 3 months.
+  Certificate is given and is valid for 3 months, traefik will automaticly try to renew
+  when less than 30 days is remaining.
 
   Now how to actually get it done.
 
@@ -545,30 +556,32 @@ is redirected to https by adding 4 labels.
 
 
 
-### #4 let's encrypt certificate, DNS challange on cloudflare
+### #5 let's encrypt certificate DNS challange on cloudflare
 
   My understanding of the process, simplified.
 
   `LE` - Let's Encrypt. A service that gives out free certificates</br>
-  `Certificate` - a file on the server containing cryptographic key that verifies identity of the server</br>
+  `Certificate` - a file on the server containing cryptographic key
+   that allows encrypted communication and can be also used to confirm the identity of the server</br>
   `ACME` - a protocol(precisely agreed way of communication) to negotiatie certificates
   from LE. It is part of traefik.</br>
-  `DNS` - translates domain names in to ip addresse</br>
+  `DNS` - servers on the internet, translate domain names in to ip addresse</br>
 
   Traefik uses ACME to ask LE for a certificate for a specific domain, like `whateverblablabla.org`.
-  LE answers with some random generated text that traefik puts as a new DNS record.
+  LE answers with some random generated text that traefik puts as a new DNS txt record.
   LE then checks `whateverblablabla.org` DNS records to see if the text is there.
   
   If it's there then this proves that whoever asked for the certificate controls the domain,
-  since it showed control over DNS records.
-  Certificate is given and is valid for 3 months.
+  since it showed control over DNS.
+  Certificate is given and is valid for 3 months. Traefik will automaticly try to renew
+  when less than 30 days is remaining.
 
   Benefit over httpChallenge is ability to have wildcard certificates.
   These are certificates that validate for example all subdomains `*.whateverblablabla.org`</br>
   Also no ports are needed to be open.
 
   But traefik needs to be able to make changes to DNS records,
-  there needs to be support on the DNS control provider site.
+  for this there needs to be support on the DNS control provider site.
 
   Now how to actually get it done.
 
