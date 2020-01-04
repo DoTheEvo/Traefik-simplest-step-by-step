@@ -17,6 +17,9 @@ chapters
 
 ### #1 traefik routing to various docker containers
 
+![traefik-dashboard-pic](https://i.imgur.com/5jKHJmm.png)
+
+
 - **create a new docker network** `docker network create traefik_net`.
 Traefik and the containers need to be on the same network.
 Compose creates one automaticly, but there is potential for fuckups later.
@@ -98,6 +101,8 @@ The default network is defined so that it can be used in other compose files.
 
 - **run traefik-docker-compose.yml**</br>
 `docker-compose -f traefik-docker-compose.yml up -d` will start the traefik container.
+
+    traefik is running, you can check it at the ip:8080 where you get the dashboard 
 
     *extra info:*</br>
     Typicly you see guides having just single compose file called `docker-compose.yml`
@@ -212,31 +217,20 @@ As is obvious from the patern, all that is needed is adding few self-explanatory
 
 ### #2 traefik routing to a local IP addresses
 
-If url should aim at something other than a docker container.
+![simple-network-diagram-pic](https://i.imgur.com/lTpUvWJ.png)
 
-- **create servers.yml** containing routers with a rule
-because something has to catch the desired url.
-And then theres a service, type of a loadBalancer,
-that will route traffic fitting the rule to a specific IP or domain.
 
-   `servers.yml`
-    ```
-    http:
-      routers:
-        test:
-          rule: "Host(`test.whateverblablabla.org`)"
-          service: test
-          entryPoints:
-            - web
+When url should aim at something other than a docker container.
 
-      services:
-        test:
-          loadBalancer:
-            servers:
-              - url: "http://10.0.19.5:80"
-    ```
+- **define a file provider, add required routing and service**
 
-- **define the new file provider in traefik.yml** pointing at the servers.yml file
+  This can't be defined using labels in a compose file, so a file provider is needed.
+  Somewhat common is to set traefik.yml itself as a file provider.</br>
+  Under providers theres a new `file` section and `traefik.yml` itself is set.</br>
+  Then there is a new dynamic configuration section.</br>
+  A router with a simple subdomain hostname rule. What fits that rule,
+  in this case exact url `test.whateverblablabla.org`, is send to 
+  a loadbalancer service which just routes it a specific IP and specific port.
 
     `traefik.yml`
     ```
@@ -253,35 +247,29 @@ that will route traffic fitting the rule to a specific IP or domain.
         endpoint: "unix:///var/run/docker.sock"
         exposedByDefault: false
       file:
-        filename: "servers.yml"
+        filename: "traefik.yml"
+
+    ## DYNAMIC CONFIGURATION
+    http:
+      routers:
+        route-to-local-ip:
+          rule: "Host(`test.whateverblablabla.org`)"
+          service: route-to-local-ip-service
+          priority: 1000
+          entryPoints:
+            - web
+
+      services:
+        route-to-local-ip-service:
+          loadBalancer:
+            servers:
+              - url: "http://10.0.19.5:80"
     ```
 
-- **mount servers.yml in to traefik container** by adding a line in traefik-docker-compose.yml
-
-    `traefik-docker-compose.yml`
-    ```
-    version: "3.3"
-
-    services:
-      traefik:
-        image: "traefik:v2.0"
-        container_name: "traefik"
-        ports:
-          - "80:80"
-          - "8080:8080"
-        volumes:
-          - "/var/run/docker.sock:/var/run/docker.sock:ro"
-          - "./traefik.yml:/traefik.yml:ro"
-          - "./servers.yml:/servers.yml:ro"
-
-    networks:
-      default:
-        external:
-          name: $DEFAULT_NETWORK
-    ```
-
-    test.whateverblablabla.org will now point to port 80 of some local machine with ip 10.0.19.5
-
+    Priority of the router is set to 1000, a very high value,
+    beating any possible other routers,
+    like one we use later for doing global http -> https redirect.
+    
 ### #3 middlewares
 
 Example of authentification middleware for any container.
@@ -501,24 +489,33 @@ and to assigning tsl certificate resolver named lets-encr
           name: $DEFAULT_NETWORK
     ```
 
-- **reddirect http traffic to https** by adding more labels to compose files.
+- **reddirect http traffic to https** by adding some labels to some compose files.</br>
 http entrypoint stops working with this basic https setup.
 But no point dealing with that and better to just make sure http 
-is redirected to https by adding 4 labels.
+is redirected to https by adding 4 labels that will create middleware 
+that reddirects http traffic to https. 
+There are several places that this can be declared, let's just add it to traefik compose.
 
-    `whoami-docker-compose.yml`
+    `traefik-docker-compose.yml`
     ```
-    version: '3'
+    version: "3.3"
 
     services:
-      whoami:
-        image: "containous/whoami"
-        container_name: "whoami"
+      traefik:
+        image: "traefik:v2.0"
+        container_name: "traefik"
+        env_file:
+          - .env
+        ports:
+          - "80:80"
+          - "443:443"
+          - "8080:8080"
+        volumes:
+          - "/var/run/docker.sock:/var/run/docker.sock:ro"
+          - "./traefik.yml:/traefik.yml:ro"
+          - "./acme.json:/acme.json"
         labels:
           - "traefik.enable=true"
-          - "traefik.http.routers.whoami.entrypoints=websecure"
-          - "traefik.http.routers.whoami.rule=Host(`whoami.$MY_DOMAIN`)"
-          - "traefik.http.routers.whoami.tls.certresolver=lets-encr"
           - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
           - "traefik.http.routers.redirs.rule=hostregexp(`{host:.+}`)"
           - "traefik.http.routers.redirs.entrypoints=web"
@@ -528,34 +525,17 @@ is redirected to https by adding 4 labels.
       default:
         external:
           name: $DEFAULT_NETWORK
+
     ```
+  - First label enables traefik for this traefik container, but most importantly makes other labes work.</br>
+  - Second label creates new middleware called `redirect-to-https` and assigns it scheme `https`.</br>
+  - Third label declares rule that applise, so what url are affected, its a regex that just say everyhing.</br>
+  - Forth label declares entrypoint that it is applied to.</br>
+  - Fifth label assing the middleware to routers.</br>
 
-    `nginx-docker-compose.yml`
-    ```
-    version: '3'
-
-    services:
-      nginx:
-        image: nginx:latest
-        container_name: nginx
-        labels:
-          - "traefik.enable=true"
-          - "traefik.http.routers.nginx.entrypoints=websecure"
-          - "traefik.http.routers.nginx.rule=Host(`nginx.$MY_DOMAIN`)"
-          - "traefik.http.routers.nginx.tls.certresolver=lets-encr"
-          - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-          - "traefik.http.routers.redirs.rule=hostregexp(`{host:.+}`)"
-          - "traefik.http.routers.redirs.entrypoints=web"
-          - "traefik.http.routers.redirs.middlewares=redirect-to-https"
-
-    networks:
-      default:
-        external:
-          name: $DEFAULT_NETWORK
-    ```
-
-
-
+  At least thats my understanding, I dont really truly know any of this.
+  This is mess of labels, yml format is bit more readable but still just arbitary mess.
+ 
 ### #5 let's encrypt certificate DNS challange on cloudflare
 
   My understanding of the process, simplified.
