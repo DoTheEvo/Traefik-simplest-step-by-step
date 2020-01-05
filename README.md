@@ -75,11 +75,11 @@ so there's smaller possibility for a fuckup when forgeting to change some variab
     and then `printenv` can be useful.
 
 - **create traefik-docker-compose.yml** file. It's a simple typical compose file.
-Port 80 is mapped since we want traefik to be in charge of it and use it as entrypoint.
+Port 80 is mapped since we want traefik to be in charge of whot comes on it - use it as entrypoint.
 Port 8080 is for dashboard where traefik shows info and stats.
 Mount of docker.sock is needed so it can actually do its job communicating with docker.
 Mount of traefik.yml is what gives the static traefik configuration.
-The default network is defined so that it can be used in other compose files.
+The default network is set to the one created in the first step, as it will be set in all other compose files.
 
     `traefik-docker-compose.yml`
     ```
@@ -89,6 +89,7 @@ The default network is defined so that it can be used in other compose files.
       traefik:
         image: "traefik:v2.1"
         container_name: "traefik"
+        hostname: "traefik"
         ports:
           - "80:80"
           - "8080:8080"
@@ -141,6 +142,7 @@ But just in case
       whoami:
         image: "containous/whoami"
         container_name: "whoami"
+        hostname: "whoami"
         labels:
           - "traefik.enable=true"
           - "traefik.http.routers.whoami.entrypoints=web"
@@ -160,6 +162,7 @@ But just in case
       nginx:
         image: nginx:latest
         container_name: nginx
+        hostname: nginx
         labels:
           - "traefik.enable=true"
           - "traefik.http.routers.nginx.entrypoints=web"
@@ -179,6 +182,7 @@ But just in case
       apache:
         image: httpd:latest
         container_name: apache
+        hostname: apache
         labels:
           - "traefik.enable=true"
           - "traefik.http.routers.apache.entrypoints=web"
@@ -198,6 +202,7 @@ But just in case
       portainer:
         image: portainer/portainer
         container_name: portainer
+        hostname: portainer
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock:ro
           - portainer_data:/data
@@ -309,6 +314,7 @@ Example of an authentification middleware for any container.
       traefik:
         image: "traefik:v2.1"
         container_name: "traefik"
+        hostname: "traefik"
         ports:
           - "80:80"
           - "8080:8080"
@@ -341,6 +347,7 @@ Example of an authentification middleware for any container.
     whoami:
       image: "containous/whoami"
       container_name: "whoami"
+      hostname: "whoami"
       labels:
         - "traefik.enable=true"
         - "traefik.http.routers.whoami.entrypoints=web"
@@ -362,6 +369,7 @@ Example of an authentification middleware for any container.
     nginx:
       image: nginx:latest
       container_name: nginx
+      hostname: nginx
       labels:
         - "traefik.enable=true"
         - "traefik.http.routers.nginx.entrypoints=web"
@@ -465,6 +473,7 @@ Example of an authentification middleware for any container.
       traefik:
         image: "traefik:v2.1"
         container_name: "traefik"
+        hostname: "traefik"
         env_file:
           - .env
         ports:
@@ -495,6 +504,7 @@ and assigning certificate resolver named `lets-encr` to the router named `whoami
       whoami:
         image: "containous/whoami"
         container_name: "whoami"
+        hostname: "whoami"
         labels:
           - "traefik.enable=true"
           - "traefik.http.routers.whoami.entrypoints=websecure"
@@ -515,6 +525,7 @@ and assigning certificate resolver named `lets-encr` to the router named `whoami
       nginx:
         image: nginx:latest
         container_name: nginx
+        hostname: nginx
         labels:
           - "traefik.enable=true"
           - "traefik.http.routers.nginx.entrypoints=websecure"
@@ -551,6 +562,7 @@ This example goes with labels in traefik compose.
       traefik:
         image: "traefik:v2.1"
         container_name: "traefik"
+        hostname: "traefik"
         env_file:
           - .env
         ports:
@@ -685,6 +697,7 @@ For cloudflare variables are
       traefik:
         image: "traefik:v2.1"
         container_name: "traefik"
+        hostname: "traefik"
         env_file:
           - .env
         ports:
@@ -717,6 +730,7 @@ For cloudflare variables are
       whoami:
         image: "containous/whoami"
         container_name: "whoami"
+        hostname: "whoami"
         labels:
           - "traefik.enable=true"
           - "traefik.http.routers.whoami.entrypoints=websecure"
@@ -739,6 +753,7 @@ For cloudflare variables are
       nginx:
         image: nginx:latest
         container_name: nginx
+        hostname: nginx
         labels:
           - "traefik.enable=true"
           - "traefik.http.routers.nginx.entrypoints=websecure"
@@ -772,6 +787,7 @@ For cloudflare variables are
       traefik:
         image: "traefik:v2.1"
         container_name: "traefik"
+        hostname: "traefik"
         env_file:
           - .env
         ports:
@@ -804,6 +820,7 @@ For cloudflare variables are
       whoami:
         image: "containous/whoami"
         container_name: "whoami"
+        hostname: "whoami"
         labels:
           - "traefik.enable=true"
           - "traefik.http.routers.whoami.entrypoints=websecure"
@@ -824,6 +841,7 @@ For cloudflare variables are
       nginx:
         image: nginx:latest
         container_name: nginx
+        hostname: nginx
         labels:
           - "traefik.enable=true"
           - "traefik.http.routers.nginx.entrypoints=websecure"
@@ -845,6 +863,7 @@ For cloudflare variables are
       apache:
         image: httpd:latest
         container_name: apache
+        hostname: apache
         labels:
           - "traefik.enable=true"
           - "traefik.http.routers.apache.entrypoints=websecure"
@@ -869,6 +888,7 @@ adding redirect middleware to the docker compose.
       traefik:
         image: "traefik:v2.1"
         container_name: "traefik"
+        hostname: "traefik"
         env_file:
           - .env
         ports:
