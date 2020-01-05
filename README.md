@@ -15,7 +15,7 @@ chapters
 4. [let's encrypt certificate html challange](#4-lets-encrypt-certificate-html-challange)
 5. [let's encrypt certificate DNS challange](#5-lets-encrypt-certificate-DNS-challange-on-cloudflare)
 
-### #1 traefik routing to various docker containers
+# #1 traefik routing to various docker containers
 
 ![traefik-dashboard-pic](https://i.imgur.com/5jKHJmm.png)
 
@@ -223,7 +223,7 @@ But just in case
     `docker-compose -f portainer-docker-compose.yml up -d`
 
 
-### #2 traefik routing to a local IP addresses
+# #2 traefik routing to a local IP addresses
 
 When url should aim at something other than a docker container.
 
@@ -283,7 +283,7 @@ When url should aim at something other than a docker container.
 - **run traefik-docker-compose** and it will work
 
     
-### #3 middlewares
+# #3 middlewares
 
 Example of an authentification middleware for any container.
 
@@ -377,7 +377,7 @@ Example of an authentification middleware for any container.
 
 - **run the damn containers** and now there is login and password needed
 
-### #4 let's encrypt certificate, html challange
+# #4 let's encrypt certificate, html challange
 
 ![letsencrypt-html-chalalnge-pic](https://i.imgur.com/yTshxC9.png)
 
@@ -577,7 +577,7 @@ This example goes with labels in traefik compose.
 
   You only want this declared once, not in every container.
  
-### #5 let's encrypt certificate DNS challange on cloudflare
+# #5 let's encrypt certificate DNS challange on cloudflare
 
 ![letsencrypt-html-chalalnge-pic](https://i.imgur.com/dkgxFTR.png)
 
