@@ -12,8 +12,8 @@ chapters
 1. [traefik routing to docker containers](#1-traefik-routing-to-various-docker-containers)
 2. [traefik routing to a local IP addresses](#2-traefik-routing-to-a-local-IP-addresses)
 3. [middlewares](#3-middlewares)
-4. [let's encrypt certificate html challange](#4-let's-encrypt-certificate,-html-challange)
-5. [let's encrypt certificate DNS challange](#5-let's-encrypt-certificate-DNS-challange-on-cloudflare)
+4. [let's encrypt certificate html challange](#4-lets-encrypt-certificate-html-challange)
+5. [let's encrypt certificate DNS challange](#5-lets-encrypt-certificate-DNS-challange-on-cloudflare)
 
 ### #1 traefik routing to various docker containers
 
