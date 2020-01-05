@@ -117,10 +117,11 @@ The default network is set to the one created in the first step, as it will be s
 
     *extra info2:*</br>
     What you can also see in tutorials is no mention of traefik.yml(traefik.toml)
-    and stuff is just passed from docker-compose file using docker's command or labels.</br>
+    and stuff is just passed from docker-compose file using docker's commands or labels.</br>
     like this: `command: --api.insecure=true --providers.docker`</br>
-    But that way compose files look much more messy and you can't do everything from there.
-    So nicely structured yml file can be easier to digest.</br>
+    But that way compose files look much more messy and you still can't do everything from there,
+    so you still sometimes need that traefik.yml.
+    So for now nicely structured yml file can be easier to digest.</br>
 
 - **add labels to containers** that you want traefik to route.</br>
 Here are examples of whoami, nginx, apache, portainer.</br>
@@ -240,12 +241,11 @@ When url should aim at something other than a docker container.
   so a file provider is needed.
   Somewhat common is to set traefik.yml itself as a file provider,
   or any new yml file can be created containing the dynamic config section.</br>
-  In this example traefik.yml itself used as a file provider.</br>
   Under providers theres a new `file` section and `traefik.yml` itself is set.</br>
-  Then there is a new dynamic configuration section.</br>
-  A router with a simple subdomain hostname rule. What fits that rule,
-  in this case exact url `test.whateverblablabla.org`, is send to 
-  a loadbalancer service which just routes it a specific IP and specific port.
+  Then dynamic configuration stuff is added.</br>
+  A router named `route-to-local-ip` with a simple subdomain hostname rule.
+  What fits that rule, in this case exact url `test.whateverblablabla.org`,
+  is send to the loadbalancer service which just routes it a specific IP and specific port.
 
     `traefik.yml`
     ```
@@ -295,13 +295,14 @@ Example of an authentification middleware for any container.
 ![logic-pic](https://i.imgur.com/QkfPYel.png)
 
 - **create a new file - `users_credentials`** containing username:passwords pairs,
- [htpasswd](https://www.htaccesstools.com/htpasswd-generator/) style
+ [htpasswd](https://www.htaccesstools.com/htpasswd-generator/) style</br>
+ Bellow example has password `krakatoa` set to all 3 accounts
 
     `users_credentials`
     ```
-    me:$apr1$wNMrGf17$xlOV5D1dtvFHGBYMCSjYM.
-    admin:$apr1$hwaRrKGu$hJFHy0z3KwJHovY8TGG5J/
-    bastard:$apr1$bZixfVAv$VKm66D9chzt.us.lnaJWz.
+    me:$apr1$L0RIz/oA$Fr7c.2.6R1JXIhCiUI1JF0
+    admin:$apr1$ELgBQZx3$BFx7a9RIxh1Z0kiJG0juE/
+    bastard:$apr1$gvhkVK.x$5rxoW.wkw1inm9ZIfB0zs1
     ```
 
 - **mount users_credentials in traefik-docker-compose.yml**
@@ -329,7 +330,7 @@ Example of an authentification middleware for any container.
           name: $DEFAULT_NETWORK
     ```
 
-- **add two labels to any container** which should have authentification</br>
+- **add two labels to any container** that should have authentification</br>
   - The first label attaches new middleware called `auth-middleware`
     to an already existing `whoami` router.
   - The second label gives this middleware type basicauth,
@@ -337,7 +338,7 @@ Example of an authentification middleware for any container.
 
     No need to mount the `users_credentials` here, it's traefik that needs that file
     and these lables are a way to pass info to traefik, what it should do
-    in context of various containers.
+    in context of containers.
 
   `whoami-docker-compose.yml`
   ```
@@ -424,13 +425,13 @@ Example of an authentification middleware for any container.
   certificatesResolvers is a configuration section that tells traefik
   how to use acme or other resolvers to get certifaces.</br>
   - the name of the resolver is `lets-encr` and uses acme
+  - commented out staging caServer makes LE issue a staging certificate,
+    it is an invalid certificate and wont give green lock but has no limitations,
+    if it's working it will say issued by let's encrypt.
   - Storage tells where to store given certificates - `acme.json`
   - The email is where LE sends notification about certificates expiring
   - httpChallenge is given entry point,
    so acme knows its doing http challange over port 80
-  - commented out staging caServer makes LE issue a staging certificate,
-    it is an invalid certificate and wont give green lock but has no limitations,
-    if it's working it will say issued by let's encrypt.
 
   That is all that is needed for acme, rest has traefik pre-configured
 
@@ -461,7 +462,7 @@ Example of an authentification middleware for any container.
             entryPoint: web
     ```
 
-- **add port 443 and mount acme.json** in traefik-docker-compose.yml 
+- **expose/map port 443 and mount acme.json** in traefik-docker-compose.yml 
 
   Notice that acme.json is not :ro - read only
 
@@ -537,7 +538,8 @@ and assigning certificate resolver named `lets-encr` to the router named `whoami
         external:
           name: $DEFAULT_NETWORK
     ```
-- **run the damn containers**</br> give it a minute</br>
+- **run the damn containers**</br>
+give it a minute</br>
 containers will now work only over https and have the greenlock</br>
 
 
@@ -685,7 +687,7 @@ For cloudflare variables are
   CF_API_KEY=8c08c85dadb0f8f0c63efe94fx155b6ve1abc
   ```
 
-- **add port 443 and mount acme.json** in traefik-docker-compose.yml 
+- **expose/map port 443 and mount acme.json** in traefik-docker-compose.yml 
 
   Notice that acme.json is not :ro - read only
 
@@ -916,3 +918,12 @@ adding redirect middleware to the docker compose.
         external:
           name: $DEFAULT_NETWORK
     ```
+
+# #stuff to checkout
+  - [when file provider is used for managing docker containers](https://github.com/pamendoz/personalDockerCompose)
+  - [traefik v2 forums](https://community.containo.us/c/traefik/traefik-v2)
+  - ['traefik official site blog](https://containo.us/blog/)
+  - 
+
+
+  intersting setup to check out
