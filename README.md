@@ -607,24 +607,24 @@ and assigning certificate resolver named `lets-encr` to the existing router
   `DNS` - servers on the internet, translate domain names in to ip addresse</br>
 
   Traefik uses ACME to ask LE for a certificate for a specific domain, like `whateverblablabla.org`.
-  LE answers with some random generated text that traefik puts as a new DNS txt record.
+  LE answers with some random generated text that traefik puts as a new DNS TXT record.
   LE then checks `whateverblablabla.org` DNS records to see if the text is there.
   
-  If it's there then this proves that whoever asked for the certificate controls the domain,
-  since it showed control over DNS.
+  If it's there then this proves that whoever asked for the certificate controls the domain.
   Certificate is given and is valid for 3 months. Traefik will automaticly try to renew
   when less than 30 days is remaining.
 
   Benefit over httpChallenge is ability to have wildcard certificates.
-  These are certificates that validate for example all subdomains `*.whateverblablabla.org`</br>
+  These are certificates that validate all subdomains `*.whateverblablabla.org`</br>
   Also no ports are needed to be open.
 
-  But traefik needs to be able to make changes to DNS records,
-  for this there needs to be support on the DNS control provider site.
+  But traefik needs to be able to make these automated changes to DNS records,
+  so there needs to be support for this from whoever manages sites DNS.
+  Thats why going with cloudflare.
 
   Now how to actually get it done.
 
-- **type A DNS records for all planned subdomains**
+- **add type A DNS records for all planned subdomains**
 
   [whoami, nginx, \*] are used example subdomains, each one should have A-record pointing at traefik IP
 
@@ -638,6 +638,21 @@ and assigning certificate resolver named `lets-encr` to the existing router
   
   certificatesResolvers is a configuration section that tells traefik
   how to use acme resolver to get certifaces.</br>
+
+    ```
+    certificatesResolvers:
+    lets-encr:
+      acme:
+        #caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+        email: whatever@gmail.com
+        storage: acme.json
+        dnsChallenge:
+          provider: cloudflare
+          resolvers:
+            - "1.1.1.1:53"
+            - "8.8.8.8:53"
+    ```
+
   - the name of the resolver is `lets-encr` and uses acme
   - commented out staging caServer makes LE issue a staging certificate,
     it is an invalid certificate and wont give green lock but has no limitations,
@@ -789,8 +804,9 @@ For cloudflare variables are
   - same `lets-encr` certificateresolver is used as before, the one defined in traefik.yml
   - the wildcard for subdomains(*.whateverblablabla.org) is set as the main domain to get certificate for
   - the naked domain(just plain whateverblablabla.org) is set as sans(Subject Alternative Name)
-  - again, you do need `*.whateverblablabla.org` and `whateverblablabla.org` set in your DNS control panel,
-    A-record pointing to IP of traefik
+  
+  again, you do need `*.whateverblablabla.org` and `whateverblablabla.org` 
+  set in your DNS control panel as A-record pointing to IP of traefik
 
   `traefik-docker-compose.yml`
   ```
@@ -823,8 +839,9 @@ For cloudflare variables are
         name: $DEFAULT_NETWORK
   ```
 
-  Now only thing other containers that want to be subdomain just need to have router
-  that is using websecure(443) entrypoint and the same `lets-encr` certificate resolver
+  Now if a container wants to be accessible as a subdomain,
+  it just needs a regular router that has rule for the url,
+  be on 443 port entrypoint, and use the same `lets-encr` certificate resolver
 
     `whoami-docker-compose.yml`
     ```
@@ -907,7 +924,7 @@ For cloudflare variables are
   >\- "traefik.enable=true"
 
   enables traefik on this traefik container,
-  not that there is need of the typical routing here,
+  not that there is need of the typical routing to a service here,
   but other labels would not work without this
 
   >\- "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
@@ -932,7 +949,7 @@ For cloudflare variables are
   If it fits the rule, and it does because everything fits that rule, it goes to the next step.
   Ultimatly it should get to a service, but if there is middleware declared, that middleware goes first,
   and since middleware is there, and it is some redirect scheme, it never reaches any service,
-  it gets redirected using https scheme, which I guess is stating go for port 443.
+  it gets redirected using https scheme, which I guess is stating - go for port 443.
 
   Here is the full traefik compose, with dns challenge labels from previous chapter included:
     
@@ -973,7 +990,7 @@ For cloudflare variables are
         name: $DEFAULT_NETWORK
   ```
 
-- **run the damn containers** and now http://whoami.whateverblablabla.org is immediatly changed to https://whoami.whateverblablabla.org
+- **run the damn containers** and now `http://whoami.whateverblablabla.org` is immediatly changed to `https://whoami.whateverblablabla.org`
 
 # #stuff to checkout
   - [when file provider is used for managing docker containers](https://github.com/pamendoz/personalDockerCompose)
