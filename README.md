@@ -12,8 +12,8 @@ chapters
 1. [traefik routing to docker containers](#1-traefik-routing-to-various-docker-containers)
 2. [traefik routing to a local IP addresses](#2-traefik-routing-to-a-local-IP-addresses)
 3. [middlewares](#3-middlewares)
-4. [let's encrypt certificate html challange](#4-lets-encrypt-certificate-html-challange)
-5. [let's encrypt certificate DNS challange](#5-lets-encrypt-certificate-DNS-challange-on-cloudflare)
+4. [let's encrypt certificate html challenge](#4-lets-encrypt-certificate-html-challenge)
+5. [let's encrypt certificate DNS challenge](#5-lets-encrypt-certificate-DNS-challenge-on-cloudflare)
 6. [redirect http traffic to https](#6-redirect-http-traffic-to-https)
 
 # #1 traefik routing to various docker containers
@@ -22,14 +22,14 @@ chapters
 
 - **create a new docker network** `docker network create traefik_net`.</br>
   Traefik and the containers need to be on the same network.
-  Compose creates one automaticly, but that fact is hidden and there is potential later on.
+  Compose creates one automaticly, but that fact is hidden and there is potential for a fuck up later on.
   Better to just create own network and set it as default in every compose file.
 
   *extra info:* use `docker network inspect traefik_net` to see containers connected to that network
 
 - **create traefik.yml**</br>
   This file contains so called static traefik configuration.</br>
-  In this basic example there is log level set in it, dashboard is enabled.
+  In this basic example there is log level set, dashboard is enabled.
   Entrypoint called `web` is defined at port 80. Docker provider is set and given docker socket</br>
   Since exposedbydefault is set to false, a label `"traefik.enable=true"` will be needed
   for containers that should be routed by traefik.</br>
@@ -132,19 +132,27 @@ chapters
   like [this](https://docs.traefik.io/getting-started/quick-start/): `command: --api.insecure=true --providers.docker`</br>
   But that way compose files look much more messy and you still can't do everything from there,
   you still sometimes need that damn traefik.yml.</br>
-  So... for now, going with nicely structured readable traefik.yml.
+  So... for now, going with nicely structured readable traefik.yml
 
 - **add labels to containers that traefik should route**.</br>
   Here are examples of whoami, nginx, apache, portainer.</br>
-  As is obvious from the patern, all that is needed is adding few self-explanatory labels.</br>
-  But just in case
-  - first label enables traefik
-  - second label defines router named `whoami` that listens on entrypoint web(port 80)
-  - third label defines a rule for this `whoami` router, specificly that when url
-    equals `whoami.whateverblablabla.org` (the domain name comes from the `.env` file),
-    that it means for router to do its job and route it to a service.
-  - fourth label does not exists, but pure absence of anything else is worth mentioning,
-    nothing else is said but traefik knows to route trafik to that container and all the details.
+
+  > \- "traefik.enable=true"
+
+  enables traefik
+
+  > \- "traefik.http.routers.whoami.entrypoints=web"
+
+  defines router named `whoami` that listens on entrypoint web(port 80)
+
+  > \- "traefik.http.routers.whoami.rule=Host(`whoami.$MY_DOMAIN`)"
+
+  defines a rule for this `whoami` router, specificly that when url
+  equals `whoami.whateverblablabla.org` (the domain name comes from the `.env` file),
+  that it means for router to do its job and route it to a service.
+  
+  Nothing else is needed, traefik knows the rest from the fact that these labes
+  are coming from context of a docker container.
 
   `whoami-docker-compose.yml`
   ```
@@ -421,7 +429,7 @@ Example of an authentification middleware for any container.
     `docker-compose -f whoami-docker-compose.yml up -d`</br>
     `docker-compose -f nginx-docker-compose.yml up -d`</br>
 
-# #4 let's encrypt certificate, html challange
+# #4 let's encrypt certificate, html challenge
 
 ![letsencrypt-html-chalalnge-pic](https://i.imgur.com/yTshxC9.png)
 
@@ -466,7 +474,7 @@ Example of an authentification middleware for any container.
   - Storage tells where to store given certificates - `acme.json`
   - The email is where LE sends notification about certificates expiring
   - httpChallenge is given entry point,
-   so acme knows its doing http challange over port 80
+   so acme knows its doing http challenge over port 80
 
   That is all that is needed for acme, rest has traefik pre-configured
 
@@ -585,7 +593,7 @@ and assigning certificate resolver named `lets-encr` to the existing router
   check content of acme.json</br>
   delete acme.json if you want fresh start
  
-# #5 let's encrypt certificate DNS challange on cloudflare
+# #5 let's encrypt certificate DNS challenge on cloudflare
 
 ![letsencrypt-html-chalalnge-pic](https://i.imgur.com/dkgxFTR.png)
 
@@ -639,7 +647,7 @@ and assigning certificate resolver named `lets-encr` to the existing router
   - dnsChallenge is specified with a [provider](https://docs.traefik.io/https/acme/#providers),
     in this case cloudflare. Each provider needs differently named enviroment variable
     in the .env file, but thats later, here it just needs the name of the provider
-  - resolvers are IP of well known DNS servers to use during challange
+  - resolvers are IP of well known DNS servers to use during challenge
 
   `traefik.yml`
   ```
@@ -775,7 +783,7 @@ For cloudflare variables are
   `docker-compose -f whoami-docker-compose.yml up -d`</br>
   `docker-compose -f nginx-docker-compose.yml up -d`</br>
 
-- **Fuck that, the whole point of DNS challange is to get wildcards!**</br>
+- **Fuck that, the whole point of DNS challenge is to get wildcards!**</br>
   fair enough</br>
   so for wildcard these labels go in to traefik compose.
   - same `lets-encr` certificateresolver is used as before, the one defined in traefik.yml
@@ -885,62 +893,87 @@ For cloudflare variables are
 
 # #6 redirect http traffic to https
 
-![simple-network-diagram-pic](https://i.imgur.com/twTDSym.png)
+  ![simple-network-diagram-pic](https://i.imgur.com/twTDSym.png)
 
-  http stops working with https setup, better to redirect http(80) attempts to https(443).</br>
+  http stops working with https setup, better to redirect http(80) to https(443).</br>
   Traefik has special type of middleware for this purpose - redirectscheme.
-  
+
   There are several places where this redirect can be declared,
-  in traefik.yml in dynamic section, or using labels in any running container.</br>
-  This example goes with labels in traefik compose.
+  in `traefik.yml`, in the dynamic section when `traefik.yml` itself is set as a file provider.</br>
+  Or using labels in any running container, this example does it in traefik compose.
 
-  - First label enables traefik, otherwise other labels would be ignored.</br>
-  - Second label creates new middleware called `redirect-to-https`, type "redirectscheme"
-    and assigns it scheme `https`.</br>
-  - Third label creates new router called `redirect-https`, with a regex rule that
-    catches any and every incoming request entering traefik
-  - Forth label declares on which entrypoint this is applied - web(port 80) </br>
-  - Fifth label assing the created middleware to this freshly created router.</br>
+- **add new router and a redirect scheme using labels in traefik compose**
+
+  >\- "traefik.enable=true"
+
+  enables traefik on this traefik container,
+  not that there is need of the typical routing here,
+  but other labels would not work without this
+
+  >\- "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+
+  creates new middleware called `redirect-to-https`, type "redirectscheme"
+  and assigns it scheme `https`.</br>
+
+  >\- "traefik.http.routers.redirect-https.rule=hostregexp(`{host:.+}`)"
+
+  creates new router called `redirect-https`, with a regex rule that
+  catches any and every incoming request
+
+  >\- "traefik.http.routers.redirect-https.entrypoints=web"
+
+  declares on which entrypoint this router listens - web(port 80) </br>
+
+  >\- "traefik.http.routers.redirect-https.middlewares=redirect-to-https"
+
+  assings the freshly created redirectscheme middleware to this freshly created router.
+
+  So to sum it up, when a request comes at port 80, router that listens at that entrypoint looks at it.
+  If it fits the rule, and it does because everything fits that rule, it goes to the next step.
+  Ultimatly it should get to a service, but if there is middleware declared, that middleware goes first,
+  and since middleware is there, and it is some redirect scheme, it never reaches any service,
+  it gets redirected using https scheme, which I guess is stating go for port 443.
+
+  Here is the full traefik compose, with dns challenge labels from previous chapter included:
     
-    `traefik-docker-compose.yml`
-    ```
-    version: "3.7"
+  `traefik-docker-compose.yml`
+  ```
+  version: "3.7"
 
-    services:
-      traefik:
-        image: "traefik:v2.1"
-        container_name: "traefik"
-        hostname: "traefik"
-        env_file:
-          - .env
-        ports:
-          - "80:80"
-          - "443:443"
-          - "8080:8080"
-        volumes:
-          - "/var/run/docker.sock:/var/run/docker.sock:ro"
-          - "./traefik.yml:/traefik.yml:ro"
-          - "./acme.json:/acme.json"
-        labels:
-          - "traefik.enable=true"
-          ## DNS CHALLANGE
-          - "traefik.http.routers.traefik.tls.certresolver=lets-encr"
-          - "traefik.http.routers.traefik.tls.domains[0].main=*.$MY_DOMAIN"
-          - "traefik.http.routers.traefik.tls.domains[0].sans=$MY_DOMAIN"
-          ## HTTP REDIRECT
-          - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-          - "traefik.http.routers.redirect-https.rule=hostregexp(`{host:.+}`)"
-          - "traefik.http.routers.redirect-https.entrypoints=web"
-          - "traefik.http.routers.redirect-https.middlewares=redirect-to-https"
+  services:
+    traefik:
+      image: "traefik:v2.1"
+      container_name: "traefik"
+      hostname: "traefik"
+      env_file:
+        - .env
+      ports:
+        - "80:80"
+        - "443:443"
+        - "8080:8080"
+      volumes:
+        - "/var/run/docker.sock:/var/run/docker.sock:ro"
+        - "./traefik.yml:/traefik.yml:ro"
+        - "./acme.json:/acme.json"
+      labels:
+        - "traefik.enable=true"
+        ## DNS CHALLENGE
+        - "traefik.http.routers.traefik.tls.certresolver=lets-encr"
+        - "traefik.http.routers.traefik.tls.domains[0].main=*.$MY_DOMAIN"
+        - "traefik.http.routers.traefik.tls.domains[0].sans=$MY_DOMAIN"
+        ## HTTP REDIRECT
+        - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+        - "traefik.http.routers.redirect-https.rule=hostregexp(`{host:.+}`)"
+        - "traefik.http.routers.redirect-https.entrypoints=web"
+        - "traefik.http.routers.redirect-https.middlewares=redirect-to-https"
 
-    networks:
-      default:
-        external:
-          name: $DEFAULT_NETWORK
-    ```
+  networks:
+    default:
+      external:
+        name: $DEFAULT_NETWORK
+  ```
 
-  The above example contains labels for dns challange too,
-  only http redirect section is required if doing different challange
+- **run the damn containers** and now http://whoami.whateverblablabla.org is immediatly changed to https://whoami.whateverblablabla.org
 
 # #stuff to checkout
   - [when file provider is used for managing docker containers](https://github.com/pamendoz/personalDockerCompose)
