@@ -12,9 +12,9 @@ chapters
 1. [traefik routing to docker containers](#1-traefik-routing-to-various-docker-containers)
 2. [traefik routing to a local IP addresses](#2-traefik-routing-to-a-local-IP-addresses)
 3. [middlewares](#3-middlewares)
-4. [let's encrypt certificate http challenge](#4-lets-encrypt-certificate-http-challenge)
+4. [let's encrypt certificate HTTP challenge](#4-lets-encrypt-certificate-HTTP-challenge)
 5. [let's encrypt certificate DNS challenge](#5-lets-encrypt-certificate-DNS-challenge-on-cloudflare)
-6. [redirect http traffic to https](#6-redirect-http-traffic-to-https)
+6. [redirect HTTP traffic to HTTPS](#6-redirect-HTTP-traffic-to-HTTPS)
 
 # #1 traefik routing to various docker containers
 
@@ -428,7 +428,7 @@ Example of an authentication middleware for any container.
     `docker-compose -f whoami-docker-compose.yml up -d`</br>
     `docker-compose -f nginx-docker-compose.yml up -d`</br>
 
-# #4 let's encrypt certificate, http challenge
+# #4 let's encrypt certificate, HTTP challenge
 
 ![letsencrypt-http-challenge-pic](https://i.imgur.com/yTshxC9.png)
 
@@ -605,7 +605,7 @@ and assigning certificate resolver named `lets-encr` to the existing router
  
 # #5 let's encrypt certificate DNS challenge on cloudflare
 
-![letsencrypt-http-challenge-pic](https://i.imgur.com/dkgxFTR.png)
+![letsencrypt-dns-challenge-pic](https://i.imgur.com/dkgxFTR.png)
 
   My understanding of the process, simplified.
 
@@ -920,7 +920,7 @@ For cloudflare variables are
 
 # #6 redirect http traffic to https
 
-  ![simple-network-diagram-pic](https://i.imgur.com/twTDSym.png)
+  ![padlocks-pic](https://i.imgur.com/twTDSym.png)
 
   http stops working with https setup, better to redirect http(80) to https(443).</br>
   Traefik has special type of middleware for this purpose - redirectscheme.
